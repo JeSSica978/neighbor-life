@@ -5,9 +5,13 @@
     <select id="queryVoucherOfShop" resultType="com.hmdp.entity.Voucher" parameterType="java.lang.Long">
         SELECT
             v.`id`, v.`shop_id`, v.`title`, v.`sub_title`, v.`rules`, v.`pay_value`,
-            v.`actual_value`, v.`type`, sv.`stock` , sv.begin_time , sv.end_time
+            v.`actual_value`, v.`type`, v.`status`, sv.`stock` , sv.begin_time , sv.end_time,
+            p.valid_days,p.valid_until,p.min_spend,p.refund_allowed,COALESCE(p.ready,1) ready
         FROM tb_voucher v
         LEFT JOIN  tb_seckill_voucher sv ON v.id = sv.voucher_id
-        WHERE v.shop_id = #{shopId} AND v.type = 1 AND v.status = 1
+        LEFT JOIN tb_voucher_policy p ON p.voucher_id=v.id
+        LEFT JOIN tb_shop_settings st ON st.shop_id=v.shop_id
+        WHERE v.shop_id = #{shopId} AND v.type IN (0, 1) AND v.status = 1 AND COALESCE(st.status,1)=1
+        ORDER BY v.type DESC, v.id ASC
     </select>
 </mapper>

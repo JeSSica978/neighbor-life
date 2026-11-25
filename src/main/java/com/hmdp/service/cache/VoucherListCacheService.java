@@ -1,109 +1,92 @@
 package com.hmdp.service.cache;
 
-import cn.hutool.core.collection.CollectionUtil;
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
-import com.github.benmanes.caffeine.cache.CacheLoader;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.*;
 import com.hmdp.config.VoucherCacheProperties;
 import com.hmdp.entity.Voucher;
 import com.hmdp.mapper.VoucherMapper;
-import lombok.extern.slf4j.Slf4j;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.Resource;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.TimeUnit;
-
-import static com.hmdp.utils.RedisConstants.CACHE_VOUCHER_LIST_KEY;
-
-@Slf4j
 @Service
 public class VoucherListCacheService {
+  // Caffeine/Redis 只存静态商品资料；每次响应另读 Redis 库存并复制 DTO，防止 L1 留住旧库存。
+  @Resource private VoucherMapper voucherMapper;
+  @Resource private StringRedisTemplate redis;
+  @Resource private VoucherCacheProperties props;
+  private LoadingCache<String, List<Voucher>> l1;
 
-    @Resource
-    private VoucherMapper voucherMapper;
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
-    @Resource
-    private VoucherCacheProperties cacheProperties;
+  @PostConstruct
+  public void initCache() {
+    l1 =
+        Caffeine.newBuilder()
+            .maximumSize(1000)
+            .refreshAfterWrite(props.getRefreshAfterWrite().toMillis(), TimeUnit.MILLISECONDS)
+            .expireAfterWrite(props.getExpireAfterWrite().toMillis(), TimeUnit.MILLISECONDS)
+            .build(k -> load(Long.parseLong(k.split(":")[0]), k.split(":")[1]));
+  }
 
-    // 1. 【秒杀优惠券信息多级缓存改造】caffeine缓存的定义, key是shopId, value是优惠券列表的json字符串
-    private LoadingCache<Long, List<Voucher>> voucherListCache;
+  private List<Voucher> db(long shop) {
+    List<Voucher> rows = voucherMapper.queryVoucherOfShop(shop);
+    if (rows == null) return Collections.emptyList();
+    for (Voucher v : rows) v.setStock(null);
+    return rows;
+  }
 
-    // 2. 【秒杀优惠券信息多级缓存改造】caffeine缓存的初始化,会在项目启动时调用
-    @PostConstruct
-    public void initCache() {
-        // 3. 【秒杀优惠券信息多级缓存改造】本地缓存的配置项(刷新时间、过期时间)、Redis缓存的过期时间
-        /*
-            refreshAfterWrite(x, TimeUnit.MILLISECONDS)
-            含义：写入后多久触发“刷新”。
-            到了这个时间后，下一次访问该 key 时，会触发重新加载最新值（注意是异步线程 refresh，当前线程会先返回旧值）。
-            重点：它不是立刻删除缓存，而是让缓存“该更新了" 提高数据一致性
+  private List<Voucher> load(long shop, String version) {
+    String key = "cache:voucher:list:" + shop + ":v:" + version;
+    String raw = redis.opsForValue().get(key);
+    if (raw != null) return JSONUtil.toList(raw, Voucher.class);
+    List<Voucher> rows = db(shop);
+    redis
+        .opsForValue()
+        .set(
+            key,
+            JSONUtil.toJsonStr(rows),
+            rows.isEmpty() ? 120000 : props.getRedisTtl().toMillis(),
+            TimeUnit.MILLISECONDS);
+    return rows;
+  }
 
-            expireAfterWrite(y, TimeUnit.MILLISECONDS)
-            含义：写入后多久“过期失效”。
-            超过这个时间，缓存项会被当作不存在，下次访问会走加载逻辑（通常同步加载新值）。
-            重点：这是硬过期时间，过期后旧值不再可用。
-        */
-        voucherListCache = Caffeine.newBuilder()
-                .maximumSize(1000)  // 缓存最大容量值
-                .refreshAfterWrite(cacheProperties.getRefreshAfterWrite().toMillis(), TimeUnit.MILLISECONDS)
-                .expireAfterWrite(cacheProperties.getExpireAfterWrite().toMillis(), TimeUnit.MILLISECONDS)
-                .build(new CacheLoader<Long, List<Voucher>>() {
-                    @Override
-                    public List<Voucher> load(Long shopId) {
-                        return loadFromRedisThenDb(shopId);
-                    }
-                });
+  public List<Voucher> getVoucherByShopId(Long shop) {
+    List<Voucher> rows;
+    try {
+      String v = redis.opsForValue().get("cache:voucher:version:" + shop);
+      if (v == null) v = "0";
+      // 所有实例先读共享版本，版本变化便使用新的 L1/L2 key。
+      // 旧请求即使晚到回填，也只能写旧版本 key；其他实例无需依赖 Kafka 广播来清 L1。
+      if ("mysql".equalsIgnoreCase(props.getMode())) rows = db(shop);
+      else if ("redis".equalsIgnoreCase(props.getMode())) rows = load(shop, v);
+      else rows = l1.get(shop + ":" + v);
+    } catch (org.springframework.data.redis.RedisConnectionFailureException e) {
+      rows = db(shop);
     }
-
-
-    // 通过商户ID获取商户的秒杀优惠券列表
-    public List<Voucher> getVoucherByShopId(Long shopId) {
-        String mode = cacheProperties.getMode();
-        switch (mode.toLowerCase(Locale.ROOT)) {
-            case "mysql":
-                return loadFromDb(shopId);
-            case "redis":
-                return loadFromRedisThenDb(shopId);
-            case "caffeine":
-            default:
-                // 直接从本地缓存中获取,若本地缓存中不存在会执行load函数,加载最新数据再返回
-                return voucherListCache.get(shopId);
+    List<Voucher> out = new ArrayList<>();
+    for (Voucher source : rows) {
+      Voucher v = BeanUtil.copyProperties(source, Voucher.class);
+      if (Integer.valueOf(1).equals(v.getType())) {
+        try {
+          String stock = redis.opsForValue().get("seckill:stock:" + v.getId());
+          v.setStock(stock == null ? 0 : Integer.parseInt(stock));
+          if (stock == null) v.setReady(false);
+        } catch (RuntimeException e) {
+          v.setStock(0);
+          v.setReady(false);
         }
+      }
+      out.add(v);
     }
+    return out;
+  }
 
-
-    // 本地缓存的load逻辑
-    private List<Voucher> loadFromRedisThenDb(Long shopId) {
-        String key = CACHE_VOUCHER_LIST_KEY + shopId;
-
-        // 1) L2: 读Redis
-        String json = stringRedisTemplate.opsForValue().get(key);
-        if (StrUtil.isNotBlank(json)) {
-            return JSONUtil.toList(json, Voucher.class);
-        }
-
-        // 2) Redis中不存在，读 MySQL
-        List<Voucher> vouchers = loadFromDb(shopId);
-
-        if(CollectionUtil.isNotEmpty(vouchers)) {
-            // 3) MySQL中数据不为空才写回 Redis, 避免写入空数据
-            long ttlMillis = cacheProperties.getRedisTtl().toMillis();
-            stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(vouchers), ttlMillis, TimeUnit.MILLISECONDS);
-        }
-
-        return vouchers;
-    }
-
-    private List<Voucher> loadFromDb(Long shopId) {
-        List<Voucher> vouchers = voucherMapper.queryVoucherOfShop(shopId);
-        return vouchers == null ? Collections.emptyList() : vouchers;
-    }
+  public void invalidate(Long shop) {
+    redis.opsForValue().increment("cache:voucher:version:" + shop);
+    redis.delete("cache:voucher:list:" + shop);
+    l1.invalidateAll();
+  }
 }

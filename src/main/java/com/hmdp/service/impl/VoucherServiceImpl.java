@@ -11,6 +11,8 @@ import com.hmdp.service.cache.VoucherListCacheService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -55,5 +57,12 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucher.setBeginTime(voucher.getBeginTime());
         seckillVoucher.setEndTime(voucher.getEndTime());
         seckillVoucherService.save(seckillVoucher);
+        // Only publish the initial stock after the new voucher's database transaction commits.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() {
+                stringRedisTemplate.opsForValue().setIfAbsent(SECKILL_STOCK_KEY + voucher.getId(),
+                        String.valueOf(voucher.getStock()));
+            }
+        });
     }
 }

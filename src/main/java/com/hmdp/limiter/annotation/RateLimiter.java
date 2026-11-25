@@ -17,6 +17,8 @@ public @interface RateLimiter {
      * 限流key前缀
      */
     String key() default "rate_limit:";
+    /** application.yaml 中 hmdp.rate.<config>.window/limit 可覆盖默认值。 */
+    String config() default "";
 
     /**
      * 时间窗口大小（秒）

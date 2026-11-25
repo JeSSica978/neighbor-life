@@ -1,22 +1,28 @@
 package com.hmdp.utils;
 
+import javax.servlet.http.*;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 public class LoginInterceptor implements HandlerInterceptor {
-
-    @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 1.判断是否需要拦截（ThreadLocal中是否有用户）
-        if (UserHolder.getUser() == null) {
-            // 没有，需要拦截，设置状态码
-            response.setStatus(401);
-            // 拦截
-            return false;
-        }
-        // 有用户，则放行
-        return true;
-    }
+  public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+      throws Exception {
+    String path = request.getRequestURI();
+    boolean publicRead =
+        "GET".equals(request.getMethod())
+            && (path.matches("/shop/(of/name|of/type|[0-9]+)")
+                || path.matches("/voucher/list/[0-9]+")
+                || path.equals("/shop-type/list")
+                || path.matches("/blog/(hot|[0-9]+|likes/[0-9]+|of/user)")
+                || path.matches("/blog/[0-9]+/comments")
+                || path.matches("/shop/[0-9]+/reviews")
+                || path.matches("/user/[0-9]+")
+                || path.matches("/community/users/[0-9]+"));
+    if (publicRead || UserHolder.getUser() != null) return true;
+    response.setStatus(401);
+    response.setContentType("application/json;charset=UTF-8");
+    response
+        .getWriter()
+        .write("{\"success\":false,\"code\":\"LOGIN_REQUIRED\",\"errorMsg\":\"请先登录\"}");
+    return false;
+  }
 }

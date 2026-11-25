@@ -1,0 +1,90 @@
+name: neighborlife-loadtest
+services:
+  mysql:
+    container_name: neighborlife-loadtest-mysql
+    image: mysql:8.0.44
+    environment:
+      MYSQL_DATABASE: hmdp_loadtest
+      MYSQL_ROOT_PASSWORD: ${LT_MYSQL_ROOT_PASSWORD:?Set LT_MYSQL_ROOT_PASSWORD locally}
+      LT_MYSQL_APP_PASSWORD: ${LT_MYSQL_APP_PASSWORD:?Set LT_MYSQL_APP_PASSWORD locally}
+      LT_MYSQL_OBSERVER_PASSWORD: ${LT_MYSQL_OBSERVER_PASSWORD:?Set LT_MYSQL_OBSERVER_PASSWORD locally}
+    ports:
+      - "127.0.0.1:${LT_MYSQL_PORT:-3307}:3306"
+    volumes:
+      - loadtest-mysql:/var/lib/mysql
+      - ./schema.sql:/opt/loadtest/schema.sql:ro
+      - ./10-init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+      # Runs after 10-init.sh on NEW dedicated volumes only. Existing volumes require explicit migration.
+      - ../../../src/main/resources/db/migration/phase4-order-lifecycle-and-reliable-events.sql:/docker-entrypoint-initdb.d/20-order-lifecycle.sql:ro
+      - ../../../src/main/resources/db/migration/phase5-normal-voucher-repurchase.sql:/docker-entrypoint-initdb.d/30-normal-repurchase.sql:ro
+    networks: [loadtest]
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysqladmin ping -h 127.0.0.1 -u root --silent']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+  redis:
+    container_name: neighborlife-loadtest-redis
+    image: redis:7.2
+    command: [redis-server, --appendonly, "yes", --appendfsync, always]
+    ports:
+      - "127.0.0.1:${LT_REDIS_PORT:-6380}:6379"
+    volumes: ["loadtest-redis:/data"]
+    networks: [loadtest]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  kafka-data-init:
+    container_name: neighborlife-loadtest-kafka-data-init
+    image: apache/kafka:3.9.1
+    user: "0:0"
+    entrypoint: [/bin/sh, -c]
+    command: ["chown 1000:1000 /data && chmod 750 /data"]
+    volumes: ["loadtest-kafka:/data"]
+    networks: [loadtest]
+  kafka:
+    container_name: neighborlife-loadtest-kafka
+    image: apache/kafka:3.9.1
+    depends_on:
+      kafka-data-init:
+        condition: service_completed_successfully
+    environment:
+      CLUSTER_ID: NExUTkVpZ2hib3JMaWZlNA
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:19093
+      KAFKA_LISTENERS: INTERNAL://:19092,EXTERNAL://:9092,CONTROLLER://:19093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,EXTERNAL://127.0.0.1:${LT_KAFKA_PORT:-9093}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    ports:
+      - "127.0.0.1:${LT_KAFKA_PORT:-9093}:9092"
+    volumes: ["loadtest-kafka:/tmp/kraft-combined-logs"]
+    networks: [loadtest]
+    healthcheck:
+      test: [CMD, /opt/kafka/bin/kafka-topics.sh, --bootstrap-server, kafka:19092, --list]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+networks:
+  loadtest:
+    name: neighborlife-loadtest-network
+volumes:
+  loadtest-mysql:
+    name: neighborlife-loadtest-mysql-data
+  loadtest-redis:
+    name: neighborlife-loadtest-redis-data
+  loadtest-kafka:
+    name: neighborlife-loadtest-kafka-data

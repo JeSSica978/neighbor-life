@@ -1,0 +1,67 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "NeighborLife: Docker Start",
+      "type": "process",
+      "command": "${env:WINDIR}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\Invoke-LocalDependencies.ps1", "-Action", "Start"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "NeighborLife: Docker Stop",
+      "type": "process",
+      "command": "${env:WINDIR}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\Invoke-LocalDependencies.ps1", "-Action", "Stop"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "NeighborLife: Docker Status",
+      "type": "process",
+      "command": "${env:WINDIR}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\Invoke-LocalDependencies.ps1", "-Action", "Status"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "NeighborLife: Check Backend Port",
+      "type": "process",
+      "command": "${env:WINDIR}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\Invoke-NeighborLife.ps1", "-Action", "CheckPort"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "NeighborLife: Prepare Debug",
+      "type": "process",
+      "command": "${env:WINDIR}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\Invoke-NeighborLife.ps1", "-Action", "CheckPort"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOrder": "sequence",
+      "dependsOn": ["NeighborLife: Check Backend Port", "NeighborLife: Docker Start"],
+      "problemMatcher": []
+    },
+    {
+      "label": "NeighborLife: Run Backend (Maven)",
+      "type": "process",
+      "command": "${env:WINDIR}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\Invoke-NeighborLife.ps1", "-Action", "Run"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "group": { "kind": "build", "isDefault": true },
+      "runOptions": { "instanceLimit": 1 }
+    },
+    {
+      "label": "NeighborLife: Stop Backend",
+      "type": "process",
+      "command": "${env:WINDIR}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\Invoke-NeighborLife.ps1", "-Action", "Stop"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

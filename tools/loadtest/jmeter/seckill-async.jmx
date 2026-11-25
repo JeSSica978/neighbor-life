@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="NeighborLife 独立异步秒杀" enabled="true">
+      <stringProp name="TestPlan.comments">只在独立 loadtest 环境运行。HTTP 成功表示受理，最终订单以 SQL 观察器为准。必须加载 safe-results.properties。</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="参数">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="host" elementType="Argument"><stringProp name="Argument.name">host</stringProp><stringProp name="Argument.value">${__P(host,127.0.0.1)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="port" elementType="Argument"><stringProp name="Argument.name">port</stringProp><stringProp name="Argument.value">${__P(port,8082)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="scheme" elementType="Argument"><stringProp name="Argument.name">scheme</stringProp><stringProp name="Argument.value">${__P(scheme,http)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="contextPath" elementType="Argument"><stringProp name="Argument.name">contextPath</stringProp><stringProp name="Argument.value">${__P(contextPath,)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="voucherId" elementType="Argument"><stringProp name="Argument.name">voucherId</stringProp><stringProp name="Argument.value">${__P(voucherId,)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="tokenCsv" elementType="Argument"><stringProp name="Argument.name">tokenCsv</stringProp><stringProp name="Argument.value">${__P(tokenCsv,)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+        </collectionProp>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"/>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="标准线程组" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="持续到时限或 CSV EOF">
+          <boolProp name="LoopController.continue_forever">false</boolProp><stringProp name="LoopController.loops">-1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(threads,1)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(ramp_seconds,10)}</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${__P(duration_seconds,70)}</stringProp>
+        <stringProp name="ThreadGroup.delay">0</stringProp><boolProp name="ThreadGroup.same_user_on_next_iteration">false</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="私有用户 Token，每行只读一次" enabled="true">
+          <stringProp name="filename">${tokenCsv}</stringProp><stringProp name="fileEncoding">UTF-8</stringProp>
+          <stringProp name="variableNames">userId,token</stringProp><boolProp name="ignoreFirstLine">false</boolProp>
+          <stringProp name="delimiter">,</stringProp><boolProp name="quotedData">false</boolProp>
+          <boolProp name="recycle">false</boolProp><boolProp name="stopThread">true</boolProp><stringProp name="shareMode">shareMode.all</stringProp>
+        </CSVDataSet><hashTree/>
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="独立 HTTP 默认值" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"/></elementProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${scheme}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.connect_timeout">3000</stringProp><stringProp name="HTTPSampler.response_timeout">15000</stringProp>
+        </ConfigTestElement><hashTree/>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="原始 Authorization Token" enabled="true">
+          <collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">authorization</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp>
+        </HeaderManager><hashTree/>
+        <OnceOnlyController guiclass="OnceOnlyControllerGui" testclass="OnceOnlyController" testname="首次采样安全校验" enabled="true"/>
+        <hashTree>
+          <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="LOADTEST_GUARD" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp><stringProp name="parameters"/><stringProp name="filename"/>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="script"><![CDATA[
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+try {
+    assert vars.get('host') == '127.0.0.1' && vars.get('scheme') == 'http'
+    assert vars.get('contextPath') == ''
+    assert vars.get('port').isInteger() && vars.get('port').toInteger() != 8081
+    assert vars.get('voucherId') ==~ /[1-9][0-9]{6,18}/
+    assert props.getProperty('sample_variables') == 'business_success,failure_reason,orderId,accepted_at,userId'
+    ['requestHeaders','responseHeaders','samplerData','response_data','response_data.on_error'].each {
+        assert props.getProperty('jmeter.save.saveservice.' + it, 'false') == 'false'
+    }
+    assert props.getProperty('jmeter.save.saveservice.output_format', 'csv') == 'csv'
+    File csv = new File(vars.get('tokenCsv')).canonicalFile
+    assert csv.name == 'tokens.csv' && csv.parentFile.parentFile.name == 'loadtest-private'
+    String cacheKey = 'loadtest.validated.' + csv.path + '.' + vars.get('voucherId')
+    synchronized (props) {
+        if (!props.containsKey(cacheKey)) {
+            def manifest = new JsonSlurper().parse(new File(csv.parentFile, 'manifest.json'))
+            assert manifest.state == 'READY'
+            assert manifest.environment.baseUrl == 'http://127.0.0.1:' + vars.get('port')
+            assert manifest.environment.database == 'hmdp_loadtest' && manifest.environment.redisPort != 6379
+            assert manifest.vouchers.any { it.active && it.id.toString() == vars.get('voucherId') }
+            def lines = csv.readLines('UTF-8')
+            def users = new HashSet(); def tokens = new HashSet()
+            def owned = manifest.users.collect { it.id.toString() }.toSet()
+            lines.each { line ->
+                def pair = line.split(',', -1)
+                assert pair.size() == 2 && owned.contains(pair[0]) && users.add(pair[0]) && tokens.add(pair[1])
+                assert pair[1] ==~ /[A-Za-z0-9_-]{16,128}/
+            }
+            assert lines.size() == manifest.users.size()
+            assert MessageDigest.getInstance('SHA-256').digest(csv.bytes).encodeHex().toString() == manifest.tokenCsvSha256
+            props.put(cacheKey, 'true')
+        }
+    }
+    SampleResult.setResponseCode('200'); SampleResult.setResponseMessage('GUARD_OK')
+    SampleResult.setSuccessful(true); SampleResult.setResponseData('GUARD_OK', 'UTF-8')
+} catch (Throwable ignored) {
+    // Never log the assertion/exception: it may contain a token or private CSV row.
+    SampleResult.setSuccessful(false); SampleResult.setResponseCode('GUARD_FAILED')
+    SampleResult.setResponseMessage('Isolated fixture or safe result settings invalid')
+    SampleResult.setResponseData('GUARD_FAILED', 'UTF-8'); SampleResult.setStopTestNow(true)
+}
+]]></stringProp>
+          </JSR223Sampler><hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="SECKILL_ACCEPT" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"/></elementProp>
+          <stringProp name="HTTPSampler.path">${contextPath}/voucher-order/seckill/${voucherId}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp><boolProp name="HTTPSampler.follow_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp><boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ConstantThroughputTimer guiclass="TestBeanGUI" testclass="ConstantThroughputTimer" testname="组级共享速率，单位 samples/minute" enabled="true">
+            <stringProp name="throughput">${__P(target_per_minute,60)}</stringProp><intProp name="calcMode">4</intProp>
+          </ConstantThroughputTimer><hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="HTTP 必须为 200" enabled="true">
+            <collectionProp name="Asserion.test_strings"><stringProp name="49586">200</stringProp></collectionProp>
+            <stringProp name="Assertion.custom_message">HTTP_STATUS_NOT_200</stringProp><stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp><intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion><hashTree/>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="提取业务成功和完整订单 ID" enabled="true">
+            <stringProp name="JSONPostProcessor.referenceNames">business_success;orderId</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.success;$.data</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">1;1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">false;INVALID</stringProp>
+          </JSONPostProcessor><hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="业务受理判断和安全结果字段" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp><stringProp name="parameters"/><stringProp name="filename"/><stringProp name="cacheKey">true</stringProp>
+            <stringProp name="script"><![CDATA[
+import groovy.json.JsonSlurper
+vars.put('business_success','false'); vars.put('orderId',''); vars.put('failure_reason','INVALID_RESPONSE')
+vars.put('accepted_at', prev.getEndTime().toString())
+try {
+    if (prev.getResponseCode() != '200') {
+        vars.put('failure_reason','HTTP_ERROR')
+    } else {
+        def body = new JsonSlurper().parseText(prev.getResponseDataAsString())
+        if (body.success == true && body.data instanceof String && body.data ==~ /[1-9][0-9]{0,18}/) {
+            Long.parseLong(body.data) // Validate positive long range without converting through double.
+            vars.put('orderId', body.data); vars.put('business_success','true'); vars.put('failure_reason','')
+        } else if (body.success == false) {
+            def reasons = ['库存不足':'SOLD_OUT','重复下单':'DUPLICATE_USER','秒杀优惠券不可用':'INVALID_VOUCHER','秒杀尚未开始':'NOT_STARTED','秒杀已结束':'ENDED','秒杀库存未初始化':'STOCK_NOT_INITIALIZED']
+            vars.put('failure_reason', reasons.get(body.errorMsg, 'BUSINESS_REJECTED'))
+        }
+    }
+} catch (Throwable ignored) { vars.put('failure_reason','INVALID_RESPONSE') }
+prev.setSuccessful(vars.get('business_success') == 'true')
+// Bodies/headers remain in memory only. safe-results.properties excludes them from JTL.
+]]></stringProp>
+          </JSR223PostProcessor><hashTree/>
+          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="HTTP 200 不等于业务成功" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp><stringProp name="parameters"/><stringProp name="filename"/><stringProp name="cacheKey">true</stringProp>
+            <stringProp name="script">if (vars.get('business_success') != 'true') { AssertionResult.setFailure(true); AssertionResult.setFailureMessage(vars.get('failure_reason')) }</stringProp>
+          </JSR223Assertion><hashTree/>
+        </hashTree>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

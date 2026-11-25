@@ -4,6 +4,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 
@@ -26,7 +27,7 @@ public class RedisIdWorker {
 
     public long nextId(String keyPrefix) {
         // 1.生成时间戳
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
         long nowSecond = now.toEpochSecond(ZoneOffset.UTC);
         long timestamp = nowSecond - BEGIN_TIMESTAMP;
 
@@ -35,6 +36,7 @@ public class RedisIdWorker {
         String date = now.format(DateTimeFormatter.ofPattern("yyyy:MM:dd"));
         // 2.2.自增长
         long count = stringRedisTemplate.opsForValue().increment("icr:" + keyPrefix + ":" + date);
+        if (count <= 0 || count > 0xffffffffL) throw new IllegalStateException("Daily order ID sequence exhausted");
 
         // 3.拼接并返回
         return timestamp << COUNT_BITS | count;

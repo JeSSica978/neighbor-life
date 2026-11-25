@@ -1,0 +1,49 @@
+.voucher-group { margin-top: 22px; }
+.voucher-group-title { margin: 0 0 12px; font-size: 14px; color: #596449; }
+.voucher { align-items: flex-start; padding: 22px; gap: 22px; }
+.voucher-price { min-width: 110px; padding-top: 8px; }
+.voucher-price-label { display: block; margin-bottom: 5px; font-size: 12px; }
+.voucher-price strong { display: block; font-size: 30px; line-height: 1.25; white-space: nowrap; }
+.voucher-price small { margin-top: 9px; font-size: 11px; }
+.voucher-badge { display: inline-block; padding: 3px 8px; margin-bottom: 9px; border-radius: 5px; font-size: 10px; color: #a94f2e; background: #ffe5cf; }
+.voucher-info h4 { font-size: 16px; line-height: 1.5; overflow-wrap: anywhere; }
+.voucher-info p { font-size: 12px; line-height: 1.7; }
+.voucher-info .voucher-offer { margin: 8px 0; color: #b45f36; font-weight: 600; }
+.voucher-info .voucher-rules { color: #88816e; }
+.voucher-info .voucher-time { margin-top: 10px; color: #79765f; font-size: 11px; }
+.voucher-info .voucher-stock { color: #a3633f; margin-top: 5px; }
+.voucher-info .voucher-status { color: #a55c35; overflow-wrap: anywhere; }
+.voucher-submit { margin-top: 12px; }
+.voucher-order-link { display: block; margin-top: 8px; }
+.orders-dialog { width: min(760px, calc(100% - 24px)); border: 0; border-radius: 20px; padding: 32px; max-height: 88vh; overflow: auto; color: #343e30; background: #fbfaf5; }
+.orders-heading { padding-right: 24px; }
+.order-card { border: 1px solid #dfe5d0; background: #fff; border-radius: 12px; padding: 20px; margin-top: 16px; }
+.order-card h3 { margin: 0 0 8px; font-size: 17px; }
+.order-card p { margin: 7px 0; overflow-wrap: anywhere; font-size: 13px; }
+.order-status { font-weight: 600; color: #657447; }
+.order-countdown { color: #ac5932; }
+.order-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.order-actions .button { min-height: 38px; padding: 8px 16px; }
+.order-pager { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+.shop-edit-form { display: grid; gap: 10px; margin-top: 20px; padding: 18px; border: 1px solid #dfe5d0; border-radius: 10px; }
+.shop-edit-form label { display: grid; gap: 6px; font-size: 13px; }
+.shop-edit-form input { padding: 9px; border: 1px solid #dfe5d0; border-radius: 6px; width: 100%; }
+.cache-event-status { font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.regular-voucher { background: #f4f6ed; border-color: #dfe5d0; }
+.regular-voucher .voucher-price { color: #657447; border-color: #cbd5b8; }
+.regular-voucher .voucher-price small { color: #87936f; }
+.regular-voucher .voucher-badge { color: #657447; background: #e5ecd7; }
+.regular-voucher .voucher-offer { color: #657447; }
+.voucher-info .voucher-kind-note { margin-top: 10px; color: #87936f; font-size: 11px; }
+@media (max-width: 600px) {
+  .voucher { gap: 15px; padding: 16px; }
+  .voucher-price { min-width: 87px; padding-right: 12px; }
+  .voucher-price strong { font-size: 26px; }
+  .voucher-info h4 { font-size: 14px; }
+  .voucher-info p { font-size: 11px; }
+}
+@media (max-width: 380px) {
+  .voucher { display: block; }
+  .voucher-price { border-right: 0; border-bottom: 1px dashed #decdbb; padding: 0 0 12px; margin-bottom: 12px; }
+  .voucher-price strong { display: inline-block; }
+}

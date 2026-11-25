@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "NeighborLife: Development (JDK 11)",
+      "request": "launch",
+      "mainClass": "com.hmdp.HmDianPingApplication",
+      "projectName": "neighbor-life",
+      "javaExec": "C:\\Program Files\\Java\\jdk-11\\bin\\java.exe",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": { "SPRING_PROFILES_ACTIVE": "default", "SERVER_PORT": "8081" },
+      "shortenCommandLine": "argfile",
+      "stepFilters": { "skipClasses": ["$JDK", "$Libraries"], "skipSynthetics": true },
+      "preLaunchTask": "NeighborLife: Prepare Debug"
+    }
+  ]
+}

@@ -17,9 +17,15 @@ import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
 public class RefreshTokenInterceptor implements HandlerInterceptor {
 
     private StringRedisTemplate stringRedisTemplate;
+    private final long ttlMinutes;
 
     public RefreshTokenInterceptor(StringRedisTemplate stringRedisTemplate) {
+        this(stringRedisTemplate, LOGIN_USER_TTL);
+    }
+    public RefreshTokenInterceptor(StringRedisTemplate stringRedisTemplate, long ttlMinutes) {
+        if (ttlMinutes < 1) throw new IllegalArgumentException("Session TTL must be positive");
         this.stringRedisTemplate = stringRedisTemplate;
+        this.ttlMinutes = ttlMinutes;
     }
 
     @Override
@@ -41,7 +47,7 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
         // 6.存在，保存用户信息到 ThreadLocal
         UserHolder.saveUser(userDTO);
         // 7.刷新token有效期
-        stringRedisTemplate.expire(key, LOGIN_USER_TTL, TimeUnit.MINUTES);
+        stringRedisTemplate.expire(key, ttlMinutes, TimeUnit.MINUTES);
         // 8.放行
         return true;
     }

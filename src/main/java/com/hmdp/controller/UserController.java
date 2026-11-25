@@ -10,6 +10,7 @@ import com.hmdp.entity.UserInfo;
 import com.hmdp.service.IUserInfoService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.UserHolder;
+import com.hmdp.business.AccountService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,10 +34,12 @@ public class UserController {
 
     @Resource
     private IUserInfoService userInfoService;
+    @Resource private AccountService accounts;
 
     /**
      * 发送手机验证码
      */
+    @com.hmdp.limiter.annotation.RateLimiter(type=com.hmdp.limiter.annotation.RateLimiter.LimitType.IP,window=60,limit=10,config="code")
     @PostMapping("code")
     public Result sendCode(@RequestParam("phone") String phone, HttpSession session) {
         // 发送短信验证码并保存验证码
@@ -47,6 +50,7 @@ public class UserController {
      * 登录功能
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
+    @com.hmdp.limiter.annotation.RateLimiter(type=com.hmdp.limiter.annotation.RateLimiter.LimitType.IP,window=60,limit=30,config="login")
     @PostMapping("/login")
     public Result login(@RequestBody LoginFormDTO loginForm, HttpSession session){
         // 实现登录功能
@@ -58,15 +62,15 @@ public class UserController {
      * @return 无
      */
     @PostMapping("/logout")
-    public Result logout(){
-        return Result.fail("功能未完成");
+    public Result logout(@RequestHeader(value="authorization",required=false)String token){
+        accounts.logout(token);
+        return Result.ok();
     }
 
     @GetMapping("/me")
     public Result me(){
         // 获取当前登录的用户并返回
-        UserDTO user = UserHolder.getUser();
-        return Result.ok(user);
+        return Result.ok(accounts.profile(UserHolder.getUser().getId()));
     }
 
     @GetMapping("/info/{id}")

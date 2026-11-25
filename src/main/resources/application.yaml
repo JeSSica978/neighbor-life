@@ -1,11 +1,14 @@
 server:
+  address: 127.0.0.1
   port: 8081
 spring:
   application:
-    name: hmdp
+    name: neighbor-life
+  main:
+    banner-mode: "console"
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+    url: jdbc:mysql://127.0.0.1:3306/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&tinyInt1isBit=false
     username: root
     password: 123456
   redis:
@@ -17,21 +20,75 @@ spring:
         max-idle: 10
         min-idle: 1
         time-between-eviction-runs: 10s
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jackson:
+    time-zone: UTC
     default-property-inclusion: non_null # JSON处理时忽略非空字段
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 10000
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+    consumer:
+      group-id: your-group-id
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      max-poll-records: 1
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        max.poll.interval.ms: 900000
+
 mybatis-plus:
   type-aliases-package: com.hmdp.entity # 别名扫描包
+  global-config:
+    banner: true
+
+
 logging:
   level:
-    com.hmdp: debug
+    root: info
+    com.hmdp: info
+    # 保留 SQL、参数与返回行数，便于联调和断点观察。
+    com.hmdp.mapper: debug
+    # 本地登录没有短信服务，保留此类的 DEBUG 验证码日志。
+    com.hmdp.service.impl.UserServiceImpl: debug
+    # 隐藏客户端配置和连接池初始化细节，保留警告及错误。
+    org.apache.kafka: warn
+    org.redisson: warn
+    org.springframework.data.repository.config: warn
   pattern:
-    dateformat: mm:ss.SSS
+    dateformat: HH:mm:ss.SSS
 
 # 【秒杀优惠券信息多级缓存改造】本地缓存的配置项(刷新时间、过期时间)、Redis缓存的过期时间
 hmdp:
+  auth:
+    session-ttl-minutes: ${HMDP_SESSION_TTL_MINUTES:30}
+    expose-development-code: ${HMDP_EXPOSE_DEVELOPMENT_CODE:true} # 本地模拟短信，页面明确标注
+  media:
+    directory: ${HMDP_MEDIA_DIRECTORY:data/uploads}
+  rate:
+    purchase:
+      window: 5
+      limit: 20
+    code:
+      window: 60
+      limit: 10
+    login:
+      window: 60
+      limit: 30
   cache:
     voucher-list:
-      mode: mysql
+      mode: caffeine
       refresh-after-write: 5s
       expire-after-write: 10m
       redis-ttl: 30m

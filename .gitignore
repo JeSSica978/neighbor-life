@@ -1,8 +1,21 @@
 HELP.md
 target/
+data/uploads/
+backups/
+# 本机日志、备份数据和原始压缩包不进入源码仓库。
+/baidulog
+/baidu.jmx
+/consultant.zip
+/hmdp.sql
+/docs/development/evidence/
+/docs/development/images/
+# AI 原型本机配置保留；仓库提供不含密钥的示例配置。
+/consultant/src/main/resources/application.yml
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
+data/uploads/
 !**/src/test/**/target/
+data/uploads/
 
 ### STS ###
 .apt_generated
@@ -30,4 +43,8 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json

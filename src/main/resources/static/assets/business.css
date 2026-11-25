@@ -1,0 +1,17 @@
+.business-dialog { width: min(760px, calc(100vw - 32px)); max-height: 88vh; border: 0; border-radius: 24px; padding: 36px; background: #faf9f5; color: #263a32; }
+.business-content h2 { margin-top: 0; padding-right: 32px; }
+.business-list { display: grid; gap: 14px; margin: 20px 0; }
+.business-card { display: block; border: 1px solid #dadfd5; padding: 18px; border-radius: 14px; background: white; margin: 12px 0; text-align: left; overflow-wrap: anywhere; }
+.business-card h3 { margin-top: 0; }
+.business-card button, .business-content > button { margin: 5px; }
+.business-field { display: flex; flex-direction: column; gap: 7px; margin: 16px 0; font-size: 14px; }
+.business-field input, .business-field textarea, .business-content > input { border: 1px solid #c7d0c3; border-radius: 9px; padding: 12px; font: inherit; color: inherit; background: white; }
+.business-field input[type="checkbox"] { width: 20px; height: 20px; }
+.business-pager, .business-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0; }
+.business-comments { margin: 22px 0; }
+.business-image { display: block; max-width: 100%; max-height: 380px; object-fit: contain; border-radius: 12px; margin: 16px 0; }
+.voucher-code { display: block; padding: 18px; border: 1px solid #ccd3c6; background: white; font-size: 18px; overflow-wrap: anywhere; user-select: all; }
+.sign-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin: 20px 0; }
+.sign-calendar span { text-align: center; padding: 12px; border-radius: 8px; background: #e8ebe3; }
+.sign-calendar .signed { background: #286b50; color: white; }
+@media (max-width: 650px) { .business-dialog { padding: 24px 18px; } .business-field input { max-width: 100%; } .business-entry .button { flex: 1 1 44%; } }
